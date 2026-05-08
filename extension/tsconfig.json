@@ -1,7 +1,12 @@
 {
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
-  "files": []
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "types": ["chrome"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@tabby/types": ["../shared-types/src/index.ts"]
+    }
+  },
+  "include": ["src"]
 }
