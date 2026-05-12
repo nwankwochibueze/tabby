@@ -2,11 +2,16 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
-    "types": ["chrome"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@crxjs/vite-plugin/client", "chrome"],
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"],
       "@tabby/types": ["../shared-types/src/index.ts"]
-    }
+    },
+    "noEmit": true,
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src"]
 }

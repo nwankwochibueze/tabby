@@ -1,33 +1,51 @@
-// Why: Log when extension installs and initialize storage defaults
+import { groupTabs } from '../shared/groupEngine';
+
+// Why: Initialize storage with empty defaults on install
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[Tabby] Extension installed');
   chrome.storage.local.set({ groups: [], sessions: [] });
 });
 
-// Why: Fired when any tab is created — entry point for grouping logic (Phase 2)
-chrome.tabs.onCreated.addListener((tab) => {
-  console.log('[Tabby] Tab created:', tab.id, tab.url);
+// Why: Re-run grouping engine whenever the tab state changes
+const refreshGroups = (): void => {
+  chrome.tabs.query({}, (chromeTabs) => {
+    const groups = groupTabs(chromeTabs);
+    chrome.storage.local.set({ groups });
+    console.log('[Tabby] Groups updated:', groups);
+  });
+};
+
+// Why: Run grouping when a new tab is created
+chrome.tabs.onCreated.addListener(() => {
+  refreshGroups();
 });
 
-// Why: Fired when tab URL or title changes — re-evaluate its context
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+// Why: Run grouping when a tab finishes loading (URL/title now available)
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (changeInfo.status === 'complete') {
-    console.log('[Tabby] Tab updated:', tabId, tab.url);
+    refreshGroups();
   }
 });
 
-// Why: Fired when a tab is closed — trigger session snapshot (Phase 4)
-chrome.tabs.onRemoved.addListener((tabId) => {
-  console.log('[Tabby] Tab closed:', tabId);
+// Why: Re-group when a tab is closed
+chrome.tabs.onRemoved.addListener(() => {
+  refreshGroups();
 });
 
-// Why: Fired when user switches tabs — track active time (Phase 5)
+// Why: Track which tab is active (used for insights in Phase 5)
 chrome.tabs.onActivated.addListener((activeInfo) => {
   console.log('[Tabby] Tab activated:', activeInfo.tabId);
 });
 
-// Why: Listen for messages from popup/dashboard
+// Why: Respond to popup/dashboard requesting current groups
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message.type === 'GET_GROUPS') {
+    chrome.storage.local.get(['groups'], (result) => {
+      sendResponse({ groups: result['groups'] ?? [] });
+    });
+    return true;
+  }
+
   if (message.type === 'GET_ALL_TABS') {
     chrome.tabs.query({}, (tabs) => {
       sendResponse({ tabs });
