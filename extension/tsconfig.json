@@ -5,6 +5,7 @@
     "jsx": "react-jsx",
     "types": ["vite/client", "@crxjs/vite-plugin/client", "chrome"],
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
       "@/*": ["./src/*"],
       "@tabby/types": ["../shared-types/src/index.ts"]
