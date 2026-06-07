@@ -3,7 +3,13 @@
   "compilerOptions": {
     "lib": ["ESNext", "DOM"],
     "jsx": "react-jsx",
-    "types": ["vite/client", "@crxjs/vite-plugin/client", "chrome"],
+    "types": [
+      "vite/client",
+      "@crxjs/vite-plugin/client",
+      "chrome",
+      "react",
+      "react-dom"
+    ],
     "baseUrl": ".",
     "ignoreDeprecations": "6.0",
     "paths": {

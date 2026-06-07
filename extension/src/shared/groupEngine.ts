@@ -8,7 +8,7 @@ const CONTEXT_COLORS: Record<TabContext, string> = {
   entertainment: '#F87171',
   social: '#34D399',
   shopping: '#FBBF24',
-  unknown: '#9CA3AF',
+  unknown: '#6B7280',
 };
 
 // Why: Maps context to a human-readable group label
@@ -18,7 +18,7 @@ const CONTEXT_LABELS: Record<TabContext, string> = {
   entertainment: 'Entertainment',
   social: 'Social',
   shopping: 'Shopping',
-  unknown: 'Other',
+  unknown: 'Unknown',
 };
 
 // Why: Converts a raw chrome.tabs.Tab into our typed Tab interface

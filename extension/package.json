@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@tabby/types": "workspace:*",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
