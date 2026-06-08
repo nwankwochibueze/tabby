@@ -19,6 +19,7 @@ const GroupCard = ({
 
   const handleTabClick = (tab: Tab) => {
     chrome.tabs.update(tab.id, { active: true });
+    setIsExpanded(false);
     onTabClick?.(tab);
   };
 
