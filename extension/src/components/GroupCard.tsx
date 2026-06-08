@@ -1,6 +1,3 @@
-// This component renders a single group card in the dashboard.
-// It displays the group label, context icon, tab count, and an expand/collapse chevron. When expanded, it shows a list of tabs in the group.
-
 import { useState } from "react";
 import { CaretDown, CaretRight } from "@phosphor-icons/react";
 import type { TabGroup, Tab } from "@tabby/types";
@@ -13,8 +10,6 @@ interface GroupCardProps {
   defaultExpanded?: boolean;
 }
 
-// ─── Component ───────────────────────────────────────────────
-
 const GroupCard = ({
   group,
   onTabClick,
@@ -23,7 +18,6 @@ const GroupCard = ({
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const handleTabClick = (tab: Tab) => {
-    // WHY: Switch to the clicked tab in Chrome
     chrome.tabs.update(tab.id, { active: true });
     onTabClick?.(tab);
   };
@@ -34,12 +28,9 @@ const GroupCard = ({
         background: "var(--bg-surface)",
         border: `1px solid ${isExpanded ? "var(--border-active)" : "var(--border-default)"}`,
         borderRadius: "var(--radius-xs)",
-        overflow: "hidden",
         transition: "border-color 0.15s ease",
       }}
     >
-      {/* ── Group Header ── */}
-
       <div
         onClick={() => setIsExpanded(!isExpanded)}
         style={{
@@ -50,6 +41,9 @@ const GroupCard = ({
           height: "44px",
           cursor: "pointer",
           userSelect: "none",
+          borderRadius: isExpanded
+            ? "var(--radius-xs) var(--radius-xs) 0 0"
+            : "var(--radius-xs)",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLDivElement).style.background =
@@ -59,10 +53,8 @@ const GroupCard = ({
           (e.currentTarget as HTMLDivElement).style.background = "transparent";
         }}
       >
-        {/* Context icon */}
         <ContextIcon context={group.context} size={16} />
 
-        {/* Group label */}
         <span
           style={{
             fontSize: "var(--font-size-md)",
@@ -75,8 +67,6 @@ const GroupCard = ({
           {group.label}
         </span>
 
-        {/* Tab count plain text */}
-
         <span
           style={{
             fontSize: "var(--font-size-xs)",
@@ -87,8 +77,6 @@ const GroupCard = ({
         >
           {group.tabs.length} Tabs
         </span>
-
-        {/* Chevron */}
 
         <span
           style={{
@@ -105,12 +93,14 @@ const GroupCard = ({
         </span>
       </div>
 
-      {/* ── Tab List ── */}
-
       {isExpanded && (
         <div
           style={{
             borderTop: "1px solid var(--border-subtle)",
+            maxHeight: "300px",
+            overflowY: "auto",
+            overflowX: "hidden",
+            borderRadius: "0 0 var(--radius-xs) var(--radius-xs)",
           }}
         >
           {group.tabs.map((tab) => (
