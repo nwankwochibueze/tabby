@@ -2,7 +2,7 @@ import {
   Briefcase,
   Flask,
   Users,
-  ShoppingBag,
+  Bag,
   Microphone,
   Ghost,
 } from "@phosphor-icons/react";
@@ -27,7 +27,7 @@ const CONTEXT_ICONS: Record<TabContext, typeof Briefcase> = {
   research: Flask,
   social: Users,
   entertainment: Microphone,
-  shopping: ShoppingBag,
+  shopping: Bag,
   unknown: Ghost,
 };
 
