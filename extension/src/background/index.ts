@@ -1,8 +1,8 @@
-import { groupTabs } from '../shared/groupEngine';
+import { groupTabs } from "../shared/groupEngine";
 
 // Why: Initialize storage with empty defaults on install
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[Tabby] Extension installed');
+  console.log("[Tabby] Extension installed");
   chrome.storage.local.set({ groups: [], sessions: [] });
 });
 
@@ -11,7 +11,7 @@ const refreshGroups = (): void => {
   chrome.tabs.query({}, (chromeTabs) => {
     const groups = groupTabs(chromeTabs);
     chrome.storage.local.set({ groups });
-    console.log('[Tabby] Groups updated:', groups);
+    console.log("[Tabby] Groups updated:", groups);
   });
 };
 
@@ -22,7 +22,7 @@ chrome.tabs.onCreated.addListener(() => {
 
 // Why: Run grouping when a tab finishes loading (URL/title now available)
 chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
-  if (changeInfo.status === 'complete') {
+  if (changeInfo.status === "complete") {
     refreshGroups();
   }
 });
@@ -34,21 +34,31 @@ chrome.tabs.onRemoved.addListener(() => {
 
 // Why: Track which tab is active (used for insights in Phase 5)
 chrome.tabs.onActivated.addListener((activeInfo) => {
-  console.log('[Tabby] Tab activated:', activeInfo.tabId);
+  console.log("[Tabby] Tab activated:", activeInfo.tabId);
 });
 
 // Why: Respond to popup/dashboard requesting current groups
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === 'GET_GROUPS') {
-    chrome.storage.local.get(['groups'], (result) => {
-      sendResponse({ groups: result['groups'] ?? [] });
+  if (message.type === "GET_GROUPS") {
+    chrome.storage.local.get(["groups"], (result) => {
+      sendResponse({ groups: result["groups"] ?? [] });
     });
     return true;
   }
 
-  if (message.type === 'GET_ALL_TABS') {
+  if (message.type === "GET_ALL_TABS") {
     chrome.tabs.query({}, (tabs) => {
       sendResponse({ tabs });
+    });
+    return true;
+  }
+
+  if (message.type === "OPEN_SIDE_PANEL") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      const tab = tabs[0];
+      if (tab?.id) {
+        chrome.sidePanel.open({ tabId: tab.id });
+      }
     });
     return true;
   }
