@@ -1,3 +1,11 @@
+// WHY THIS FILE EXISTS:
+// Handles user registration and login for Tabby.
+// Registration creates a new user with a hashed password.
+// Login verifies credentials and returns a JWT token.
+// That token is stored in the extension and sent with every
+// subsequent request to identify and authenticate the user.
+// Passwords are never stored in plain text — always bcrypt hashed.
+
 import { Hono } from "hono";
 import { sign } from "jsonwebtoken";
 import bcrypt from "bcryptjs";
