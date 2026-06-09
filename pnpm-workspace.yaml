@@ -1,4 +1,8 @@
-﻿packages:
+packages:
   - 'extension'
   - 'shared-types'
   - 'server'
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: true
+  prisma: true
