@@ -7,13 +7,12 @@
 // Passwords are never stored in plain text — always bcrypt hashed.
 
 import { Hono } from "hono";
-import { sign } from "jsonwebtoken";
+import { SignJWT } from "jose";
 import bcrypt from "bcryptjs";
 import db from "../db/client";
 
 const auth = new Hono();
 
-// POST /auth/register
 auth.post("/register", async (c) => {
   try {
     const { email, password, displayName } = await c.req.json();
@@ -30,7 +29,6 @@ auth.post("/register", async (c) => {
       return c.json({ error: "Email already registered" }, 409);
     }
 
-    // WHY: Never store plain text passwords — hash with bcrypt
     const hashed = await bcrypt.hash(password, 10);
 
     const user = await db.user.create({
@@ -50,7 +48,6 @@ auth.post("/register", async (c) => {
   }
 });
 
-// POST /auth/login
 auth.post("/login", async (c) => {
   try {
     const { email, password } = await c.req.json();
@@ -69,13 +66,13 @@ auth.post("/login", async (c) => {
       return c.json({ error: "Invalid credentials" }, 401);
     }
 
-    // WHY: JWT token contains userId and email so the server
-    // can identify the user on every subsequent request
-    const token = sign(
-      { userId: user.id, email: user.email },
-      process.env.JWT_SECRET as string,
-      { expiresIn: "7d" },
-    );
+    // WHY: JWT contains userId so the server can identify
+    // the user on every subsequent request without a DB lookup.
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET!);
+    const token = await new SignJWT({ userId: user.id, email: user.email })
+      .setProtectedHeader({ alg: "HS256" })
+      .setExpirationTime("7d")
+      .sign(secret);
 
     return c.json({
       token,
