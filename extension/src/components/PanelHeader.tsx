@@ -1,9 +1,16 @@
-import { Gear } from "@phosphor-icons/react";
+// WHY THIS FILE EXISTS:
+// PanelHeader renders the top bar of the Tabby side panel.
+// Shows logo, wordmark, total tab count and settings gear.
+// Settings gear shows a dropdown with logout option.
+
+import { useState } from "react";
+import { Gear, SignOut } from "@phosphor-icons/react";
 import CountBadge from "./CountBadge";
+import { tokenApi } from "../shared/api";
 
 interface PanelHeaderProps {
   totalTabs: number;
-  onSettingsClick?: () => void;
+  onLogout: () => void;
 }
 
 const LogoMark = () => (
@@ -19,9 +26,15 @@ const LogoMark = () => (
   />
 );
 
-// ─── Component ───────────────────────────────────────────────
+const PanelHeader = ({ totalTabs, onLogout }: PanelHeaderProps) => {
+  const [showMenu, setShowMenu] = useState(false);
 
-const PanelHeader = ({ totalTabs, onSettingsClick }: PanelHeaderProps) => {
+  const handleLogout = async () => {
+    await tokenApi.clear();
+    setShowMenu(false);
+    onLogout();
+  };
+
   return (
     <div
       style={{
@@ -33,9 +46,9 @@ const PanelHeader = ({ totalTabs, onSettingsClick }: PanelHeaderProps) => {
         background: "var(--bg-base)",
         borderBottom: "1px solid var(--border-default)",
         flexShrink: 0,
+        position: "relative",
       }}
     >
-      {/* Logo mark + wordmark */}
       <div
         style={{
           display: "flex",
@@ -58,13 +71,11 @@ const PanelHeader = ({ totalTabs, onSettingsClick }: PanelHeaderProps) => {
         </span>
       </div>
 
-      {/* Total tab count */}
-
       <CountBadge count={totalTabs} />
 
-      {/* Settings icon */}
+      {/* Settings gear */}
       <button
-        onClick={onSettingsClick}
+        onClick={() => setShowMenu(!showMenu)}
         style={{
           display: "flex",
           alignItems: "center",
@@ -74,19 +85,68 @@ const PanelHeader = ({ totalTabs, onSettingsClick }: PanelHeaderProps) => {
           cursor: "pointer",
           padding: "var(--spacing-xs)",
           borderRadius: "var(--radius-xs)",
-          color: "var(--text-muted)",
+          color: showMenu ? "var(--text-secondary)" : "var(--text-muted)",
+          position: "relative",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.color =
             "var(--text-secondary)";
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.color =
-            "var(--text-muted)";
+          if (!showMenu) {
+            (e.currentTarget as HTMLButtonElement).style.color =
+              "var(--text-muted)";
+          }
         }}
       >
         <Gear size={20} weight="regular" />
       </button>
+
+      {/* Dropdown menu */}
+      {showMenu && (
+        <div
+          style={{
+            position: "absolute",
+            top: "48px",
+            right: "var(--spacing-lg)",
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border-default)",
+            borderRadius: "var(--radius-md)",
+            overflow: "hidden",
+            zIndex: 100,
+            minWidth: "160px",
+          }}
+        >
+          <button
+            onClick={handleLogout}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--spacing-sm)",
+              width: "100%",
+              padding: "10px var(--spacing-md)",
+              background: "transparent",
+              border: "none",
+              color: "var(--text-danger)",
+              fontSize: "var(--font-size-sm)",
+              fontFamily: "var(--font-family)",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background =
+                "var(--bg-hover)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background =
+                "transparent";
+            }}
+          >
+            <SignOut size={14} />
+            Sign out
+          </button>
+        </div>
+      )}
     </div>
   );
 };
