@@ -1,7 +1,16 @@
-import { PrismaClient } from "@prisma/client";
+// WHY THIS FILE EXISTS:
+// Single Prisma database client shared across the entire server.
+// Prisma 7 requires a driver adapter — it no longer accepts a plain
+// connection string. PrismaPg is the official PostgreSQL adapter
+// that connects to our Supabase database using the DATABASE_URL
+// from our .env file.
 
-// WHY: Single Prisma instance shared across the entire server.
-// Creating multiple instances causes connection pool exhaustion.
-const db = new PrismaClient();
+import 'dotenv/config'
+import { PrismaClient } from '@prisma/client'
+import { PrismaPg } from '@prisma/adapter-pg'
 
-export default db;
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+
+const db = new PrismaClient({ adapter })
+
+export default db
