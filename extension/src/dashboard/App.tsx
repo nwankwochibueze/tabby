@@ -1,8 +1,9 @@
-// ─── Overview ──────────────────────────────────────────────
 // WHY THIS FILE EXISTS:
 // App.tsx is the root component of the Tabby side panel.
 // It reads tab groups from chrome.storage, manages search
 // and filter state, and renders the full panel UI.
+// It also checks for a JWT token — if none exists it shows
+// the LoginForm instead of the main dashboard.
 
 import { useState, useEffect } from "react";
 import type { TabGroup } from "@tabby/types";
@@ -10,15 +11,21 @@ import PanelHeader from "../components/PanelHeader";
 import SearchBar from "../components/SearchBar";
 import FilterChip from "../components/FilterChip";
 import GroupCard from "../components/GroupCard";
+import LoginForm from "../components/LoginForm";
+import { tokenApi } from "../shared/api";
 
 type FilterMode = "ALL_TABS" | "RECENT" | "DUPLICATES";
-
-// ─── Component ───────────────────────────────────────────────
 
 const App = () => {
   const [groups, setGroups] = useState<TabGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("ALL_TABS");
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+
+  // WHY: Check for existing token on mount to decide which view to show.
+  useEffect(() => {
+    tokenApi.exists().then(setIsLoggedIn);
+  }, []);
 
   useEffect(() => {
     chrome.storage.local.get(["groups"], (result) => {
@@ -42,7 +49,6 @@ const App = () => {
 
   const filteredGroups = groups
     .map((group) => {
-      
       const filteredTabs = group.tabs.filter((tab) => {
         const query = searchQuery.toLowerCase();
         if (!query) return true;
@@ -51,15 +57,33 @@ const App = () => {
           tab.url.toLowerCase().includes(query)
         );
       });
-
       return { ...group, tabs: filteredTabs };
     })
-
     .filter((group) => group.tabs.length > 0);
 
   const totalTabs = groups.reduce((sum, g) => sum + g.tabs.length, 0);
 
-  // ── Render ────────────────────────────────────────────────
+  // WHY: null means token check is still in progress — render nothing
+  // to avoid a flash of the wrong screen.
+  if (isLoggedIn === null) return null;
+
+  // WHY: No token found — show login form instead of dashboard.
+  if (!isLoggedIn) {
+    return (
+      <div
+        style={{
+          width: "var(--panel-width)",
+          height: "100vh",
+          background: "var(--bg-base)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+        }}
+      >
+        <LoginForm onSuccess={() => setIsLoggedIn(true)} />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -73,10 +97,8 @@ const App = () => {
         overflow: "hidden",
       }}
     >
-      {/* Panel header — always visible */}
       <PanelHeader totalTabs={totalTabs} />
 
-      {/* Scrollable content area */}
       <div
         style={{
           flex: 1,
@@ -87,16 +109,9 @@ const App = () => {
           padding: "var(--spacing-sm) var(--spacing-sm) var(--spacing-xl)",
         }}
       >
-        {/* Search bar */}
         <SearchBar onSearch={setSearchQuery} />
 
-        {/* Filter chips */}
-        <div
-          style={{
-            display: "flex",
-            gap: "var(--spacing-xs)",
-          }}
-        >
+        <div style={{ display: "flex", gap: "var(--spacing-xs)" }}>
           {(["ALL_TABS", "RECENT", "DUPLICATES"] as FilterMode[]).map(
             (mode) => (
               <FilterChip
@@ -109,7 +124,6 @@ const App = () => {
           )}
         </div>
 
-        {/* Group cards */}
         {filteredGroups.length > 0 ? (
           filteredGroups.map((group) => (
             <GroupCard key={group.id} group={group} />
@@ -131,7 +145,6 @@ const App = () => {
           </div>
         )}
 
-        {/* New group button */}
         <button
           style={{
             display: "flex",
