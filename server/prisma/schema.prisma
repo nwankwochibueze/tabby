@@ -1,3 +1,10 @@
+// WHY THIS FILE EXISTS:
+// Defines the database schema for Tabby.
+// User model stores account credentials.
+// Session model stores saved tab groups belonging to a user.
+// Prisma reads this file to generate the TypeScript client
+// and to push schema changes to the Supabase database.
+
 generator client {
   provider = "prisma-client-js"
 }
