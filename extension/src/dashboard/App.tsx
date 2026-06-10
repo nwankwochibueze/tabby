@@ -97,7 +97,10 @@ const App = () => {
         overflow: "hidden",
       }}
     >
-      <PanelHeader totalTabs={totalTabs} />
+      <PanelHeader
+        totalTabs={totalTabs}
+        onLogout={() => setIsLoggedIn(false)}
+      />
 
       <div
         style={{
