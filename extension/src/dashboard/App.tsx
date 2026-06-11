@@ -12,7 +12,7 @@ import SearchBar from "../components/SearchBar";
 import FilterChip from "../components/FilterChip";
 import GroupCard from "../components/GroupCard";
 import LoginForm from "../components/LoginForm";
-import { tokenApi } from "../shared/api";
+import { tokenApi, sessionsApi } from "../shared/api";
 
 type FilterMode = "ALL_TABS" | "RECENT" | "DUPLICATES";
 
@@ -21,8 +21,12 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("ALL_TABS");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
+  const [showSaveInput, setShowSaveInput] = useState(false);
+  const [sessionName, setSessionName] = useState("");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
 
-  // WHY: Check for existing token on mount to decide which view to show.
   useEffect(() => {
     tokenApi.exists().then(setIsLoggedIn);
   }, []);
@@ -41,11 +45,28 @@ const App = () => {
     };
 
     chrome.storage.onChanged.addListener(handleStorageChange);
-
-    return () => {
-      chrome.storage.onChanged.removeListener(handleStorageChange);
-    };
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
+
+  const handleSaveSession = async () => {
+    if (!sessionName.trim()) return;
+
+    setSaveStatus("saving");
+    try {
+      const result = await sessionsApi.save(sessionName.trim(), groups);
+      if (result.error) {
+        setSaveStatus("error");
+        return;
+      }
+      setSaveStatus("saved");
+      setSessionName("");
+      setShowSaveInput(false);
+      // WHY: Reset status after 2 seconds so button returns to normal
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch {
+      setSaveStatus("error");
+    }
+  };
 
   const filteredGroups = groups
     .map((group) => {
@@ -63,11 +84,8 @@ const App = () => {
 
   const totalTabs = groups.reduce((sum, g) => sum + g.tabs.length, 0);
 
-  // WHY: null means token check is still in progress — render nothing
-  // to avoid a flash of the wrong screen.
   if (isLoggedIn === null) return null;
 
-  // WHY: No token found — show login form instead of dashboard.
   if (!isLoggedIn) {
     return (
       <div
@@ -100,6 +118,8 @@ const App = () => {
       <PanelHeader
         totalTabs={totalTabs}
         onLogout={() => setIsLoggedIn(false)}
+        onLogin={() => setIsLoggedIn(false)}
+        isLoggedIn={isLoggedIn === true}
       />
 
       <div
@@ -126,6 +146,107 @@ const App = () => {
             ),
           )}
         </div>
+
+        {/* Save Session UI — only shown when logged in */}
+        {isLoggedIn && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "var(--spacing-xs)",
+            }}
+          >
+            {showSaveInput ? (
+              <div
+                style={{
+                  display: "flex",
+                  gap: "var(--spacing-xs)",
+                }}
+              >
+                <input
+                  type="text"
+                  placeholder="Session name..."
+                  value={sessionName}
+                  onChange={(e) => setSessionName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSaveSession()}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: "6px var(--spacing-sm)",
+                    background: "var(--bg-surface-raised)",
+                    border: "1px solid var(--border-focus)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-primary)",
+                    fontSize: "var(--font-size-sm)",
+                    fontFamily: "var(--font-family)",
+                    outline: "none",
+                  }}
+                />
+                <button
+                  onClick={handleSaveSession}
+                  disabled={saveStatus === "saving"}
+                  style={{
+                    padding: "6px var(--spacing-sm)",
+                    background: "var(--interactive-primary)",
+                    border: "none",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-inverse)",
+                    fontSize: "var(--font-size-xs)",
+                    fontFamily: "var(--font-family)",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {saveStatus === "saving" ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSaveInput(false);
+                    setSessionName("");
+                  }}
+                  style={{
+                    padding: "6px var(--spacing-sm)",
+                    background: "transparent",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-sm)",
+                    color: "var(--text-muted)",
+                    fontSize: "var(--font-size-xs)",
+                    fontFamily: "var(--font-family)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowSaveInput(true)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "var(--spacing-xs)",
+                  padding: "7px",
+                  background: "var(--bg-surface)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-sm)",
+                  color:
+                    saveStatus === "saved"
+                      ? "var(--context-social)"
+                      : "var(--text-secondary)",
+                  fontSize: "var(--font-size-xs)",
+                  fontFamily: "var(--font-family)",
+                  cursor: "pointer",
+                  fontWeight: "var(--font-weight-medium)",
+                }}
+              >
+                {saveStatus === "saved"
+                  ? "✓ Session saved"
+                  : "💾 Save current session"}
+              </button>
+            )}
+          </div>
+        )}
 
         {filteredGroups.length > 0 ? (
           filteredGroups.map((group) => (
