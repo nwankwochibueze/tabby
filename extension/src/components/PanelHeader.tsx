@@ -1,16 +1,19 @@
 // WHY THIS FILE EXISTS:
 // PanelHeader renders the top bar of the Tabby side panel.
 // Shows logo, wordmark, total tab count and settings gear.
-// Settings gear shows a dropdown with logout option.
+// Settings gear shows contextual options based on auth state —
+// Sign out when logged in, Sign in when logged out.
 
 import { useState } from "react";
-import { Gear, SignOut } from "@phosphor-icons/react";
+import { Gear, SignOut, SignIn } from "@phosphor-icons/react";
 import CountBadge from "./CountBadge";
 import { tokenApi } from "../shared/api";
 
 interface PanelHeaderProps {
   totalTabs: number;
   onLogout: () => void;
+  onLogin: () => void;
+  isLoggedIn: boolean;
 }
 
 const LogoMark = () => (
@@ -26,13 +29,37 @@ const LogoMark = () => (
   />
 );
 
-const PanelHeader = ({ totalTabs, onLogout }: PanelHeaderProps) => {
+const PanelHeader = ({
+  totalTabs,
+  onLogout,
+  onLogin,
+  isLoggedIn,
+}: PanelHeaderProps) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const handleLogout = async () => {
     await tokenApi.clear();
     setShowMenu(false);
     onLogout();
+  };
+
+  const handleLogin = () => {
+    setShowMenu(false);
+    onLogin();
+  };
+
+  const menuButtonStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing-sm)",
+    width: "100%",
+    padding: "10px var(--spacing-md)",
+    background: "transparent",
+    border: "none",
+    fontSize: "var(--font-size-sm)",
+    fontFamily: "var(--font-family)",
+    cursor: "pointer",
+    textAlign: "left" as const,
   };
 
   return (
@@ -73,7 +100,6 @@ const PanelHeader = ({ totalTabs, onLogout }: PanelHeaderProps) => {
 
       <CountBadge count={totalTabs} />
 
-      {/* Settings gear */}
       <button
         onClick={() => setShowMenu(!showMenu)}
         style={{
@@ -102,7 +128,6 @@ const PanelHeader = ({ totalTabs, onLogout }: PanelHeaderProps) => {
         <Gear size={20} weight="regular" />
       </button>
 
-      {/* Dropdown menu */}
       {showMenu && (
         <div
           style={{
@@ -117,34 +142,53 @@ const PanelHeader = ({ totalTabs, onLogout }: PanelHeaderProps) => {
             minWidth: "160px",
           }}
         >
-          <button
-            onClick={handleLogout}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--spacing-sm)",
-              width: "100%",
-              padding: "10px var(--spacing-md)",
-              background: "transparent",
-              border: "none",
-              color: "var(--text-danger)",
-              fontSize: "var(--font-size-sm)",
-              fontFamily: "var(--font-family)",
-              cursor: "pointer",
-              textAlign: "left",
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background =
-                "var(--bg-hover)";
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background =
-                "transparent";
-            }}
-          >
-            <SignOut size={14} />
-            Sign out
-          </button>
+          {isLoggedIn ? (
+            <button
+              onClick={handleLogout}
+              style={{ ...menuButtonStyle, color: "var(--text-danger)" }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "var(--bg-hover)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  "transparent";
+              }}
+            >
+              <SignOut size={14} />
+              Sign out
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={handleLogin}
+                style={{ ...menuButtonStyle, color: "var(--text-primary)" }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    "var(--bg-hover)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    "transparent";
+                }}
+              >
+                <SignIn size={14} />
+                Sign in to sync
+              </button>
+              <div
+                style={{
+                  padding: "6px var(--spacing-md)",
+                  fontSize: "var(--font-size-xs)",
+                  color: "var(--text-muted)",
+                  fontFamily: "var(--font-family)",
+                  borderTop: "1px solid var(--border-subtle)",
+                }}
+              >
+                ✨ Save sessions, sync across devices and get AI suggestions
+                with Pro
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
