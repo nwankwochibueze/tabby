@@ -1,9 +1,8 @@
 // WHY THIS FILE EXISTS:
 // App.tsx is the root component of the Tabby side panel.
-// It reads tab groups from chrome.storage, manages search
-// and filter state, and renders the full panel UI.
-// It also checks for a JWT token — if none exists it shows
-// the LoginForm instead of the main dashboard.
+// Manages two views — dashboard and settings.
+// Dashboard shows tab groups. Settings shows account and session management.
+// Switching between them keeps both views clean and uncluttered.
 
 import { useState, useEffect } from "react";
 import type { TabGroup } from "@tabby/types";
@@ -12,23 +11,28 @@ import SearchBar from "../components/SearchBar";
 import FilterChip from "../components/FilterChip";
 import GroupCard from "../components/GroupCard";
 import LoginForm from "../components/LoginForm";
-import { tokenApi, sessionsApi } from "../shared/api";
+import SettingsPanel from "../components/SettingsPanel";
+import { tokenApi } from "../shared/api";
 
 type FilterMode = "ALL_TABS" | "RECENT" | "DUPLICATES";
+type View = "dashboard" | "settings" | "login";
 
 const App = () => {
   const [groups, setGroups] = useState<TabGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterMode, setFilterMode] = useState<FilterMode>("ALL_TABS");
   const [isLoggedIn, setIsLoggedIn] = useState<boolean | null>(null);
-  const [showSaveInput, setShowSaveInput] = useState(false);
-  const [sessionName, setSessionName] = useState("");
-  const [saveStatus, setSaveStatus] = useState<
-    "idle" | "saving" | "saved" | "error"
-  >("idle");
+  const [view, setView] = useState<View>("dashboard");
+  const [showCrashRestore, setShowCrashRestore] = useState(false);
 
   useEffect(() => {
     tokenApi.exists().then(setIsLoggedIn);
+  }, []);
+
+  useEffect(() => {
+    chrome.storage.local.get(["showCrashRestore"], (result) => {
+      if (result["showCrashRestore"]) setShowCrashRestore(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -48,26 +52,6 @@ const App = () => {
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
-  const handleSaveSession = async () => {
-    if (!sessionName.trim()) return;
-
-    setSaveStatus("saving");
-    try {
-      const result = await sessionsApi.save(sessionName.trim(), groups);
-      if (result.error) {
-        setSaveStatus("error");
-        return;
-      }
-      setSaveStatus("saved");
-      setSessionName("");
-      setShowSaveInput(false);
-      // WHY: Reset status after 2 seconds so button returns to normal
-      setTimeout(() => setSaveStatus("idle"), 2000);
-    } catch {
-      setSaveStatus("error");
-    }
-  };
-
   const filteredGroups = groups
     .map((group) => {
       const filteredTabs = group.tabs.filter((tab) => {
@@ -84,9 +68,31 @@ const App = () => {
 
   const totalTabs = groups.reduce((sum, g) => sum + g.tabs.length, 0);
 
-  if (isLoggedIn === null) return null;
+  if (isLoggedIn === null)
+    return (
+      <div
+        style={{
+          width: "var(--panel-width)",
+          height: "100vh",
+          background: "var(--bg-base)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            width: "var(--logomark-size)",
+            height: "var(--logomark-size)",
+            borderRadius: "var(--radius-sm)",
+            background:
+              "linear-gradient(135deg, var(--context-work), var(--context-research))",
+          }}
+        />
+      </div>
+    );
 
-  if (!isLoggedIn) {
+  if (view === "login") {
     return (
       <div
         style={{
@@ -98,8 +104,28 @@ const App = () => {
           justifyContent: "center",
         }}
       >
-        <LoginForm onSuccess={() => setIsLoggedIn(true)} />
+        <LoginForm
+          onSuccess={() => {
+            setIsLoggedIn(true);
+            setView("dashboard");
+          }}
+        />
       </div>
+    );
+  }
+
+  if (view === "settings") {
+    return (
+      <SettingsPanel
+        isLoggedIn={isLoggedIn === true}
+        groups={groups}
+        onClose={() => setView("dashboard")}
+        onLogout={() => {
+          setIsLoggedIn(false);
+          setView("dashboard");
+        }}
+        onLogin={() => setView("login")}
+      />
     );
   }
 
@@ -117,9 +143,7 @@ const App = () => {
     >
       <PanelHeader
         totalTabs={totalTabs}
-        onLogout={() => setIsLoggedIn(false)}
-        onLogin={() => setIsLoggedIn(false)}
-        isLoggedIn={isLoggedIn === true}
+        onSettingsClick={() => setView("settings")}
       />
 
       <div
@@ -147,104 +171,77 @@ const App = () => {
           )}
         </div>
 
-        {/* Save Session UI — only shown when logged in */}
-        {isLoggedIn && (
+        {/* Crash restore banner */}
+        {showCrashRestore && (
           <div
             style={{
+              background: "var(--bg-surface)",
+              border: "1px solid var(--context-shopping)",
+              borderRadius: "var(--radius-sm)",
+              padding: "var(--spacing-sm) var(--spacing-md)",
               display: "flex",
               flexDirection: "column",
               gap: "var(--spacing-xs)",
             }}
           >
-            {showSaveInput ? (
-              <div
-                style={{
-                  display: "flex",
-                  gap: "var(--spacing-xs)",
-                }}
-              >
-                <input
-                  type="text"
-                  placeholder="Session name..."
-                  value={sessionName}
-                  onChange={(e) => setSessionName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleSaveSession()}
-                  autoFocus
-                  style={{
-                    flex: 1,
-                    padding: "6px var(--spacing-sm)",
-                    background: "var(--bg-surface-raised)",
-                    border: "1px solid var(--border-focus)",
-                    borderRadius: "var(--radius-sm)",
-                    color: "var(--text-primary)",
-                    fontSize: "var(--font-size-sm)",
-                    fontFamily: "var(--font-family)",
-                    outline: "none",
-                  }}
-                />
-                <button
-                  onClick={handleSaveSession}
-                  disabled={saveStatus === "saving"}
-                  style={{
-                    padding: "6px var(--spacing-sm)",
-                    background: "var(--interactive-primary)",
-                    border: "none",
-                    borderRadius: "var(--radius-sm)",
-                    color: "var(--text-inverse)",
-                    fontSize: "var(--font-size-xs)",
-                    fontFamily: "var(--font-family)",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {saveStatus === "saving" ? "Saving..." : "Save"}
-                </button>
-                <button
-                  onClick={() => {
-                    setShowSaveInput(false);
-                    setSessionName("");
-                  }}
-                  style={{
-                    padding: "6px var(--spacing-sm)",
-                    background: "transparent",
-                    border: "1px solid var(--border-default)",
-                    borderRadius: "var(--radius-sm)",
-                    color: "var(--text-muted)",
-                    fontSize: "var(--font-size-xs)",
-                    fontFamily: "var(--font-family)",
-                    cursor: "pointer",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
+            <div
+              style={{
+                fontSize: "var(--font-size-sm)",
+                fontWeight: "var(--font-weight-medium)",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-family)",
+              }}
+            >
+              ⚠️ Chrome closed unexpectedly
+            </div>
+            <div
+              style={{
+                fontSize: "var(--font-size-xs)",
+                color: "var(--text-secondary)",
+                fontFamily: "var(--font-family)",
+              }}
+            >
+              Restore your last saved session?
+            </div>
+            <div style={{ display: "flex", gap: "var(--spacing-xs)" }}>
               <button
-                onClick={() => setShowSaveInput(true)}
+                onClick={() => {
+                  setShowCrashRestore(false);
+                  setView("settings");
+                  chrome.runtime.sendMessage({ type: "DISMISS_CRASH_RESTORE" });
+                }}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "var(--spacing-xs)",
-                  padding: "7px",
-                  background: "var(--bg-surface)",
-                  border: "1px solid var(--border-default)",
-                  borderRadius: "var(--radius-sm)",
-                  color:
-                    saveStatus === "saved"
-                      ? "var(--context-social)"
-                      : "var(--text-secondary)",
+                  padding: "4px var(--spacing-sm)",
+                  background: "var(--interactive-primary)",
+                  border: "none",
+                  borderRadius: "var(--radius-xs)",
+                  color: "var(--text-inverse)",
                   fontSize: "var(--font-size-xs)",
                   fontFamily: "var(--font-family)",
                   cursor: "pointer",
-                  fontWeight: "var(--font-weight-medium)",
                 }}
               >
-                {saveStatus === "saved"
-                  ? "✓ Session saved"
-                  : "💾 Save current session"}
+                View Sessions
               </button>
-            )}
+              <button
+                onClick={() => {
+                  setShowCrashRestore(false);
+                  chrome.runtime.sendMessage({ type: "DISMISS_CRASH_RESTORE" });
+                }}
+                style={{
+                  padding: "4px var(--spacing-sm)",
+                  background: "transparent",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-xs)",
+                  color: "var(--text-muted)",
+                  fontSize: "var(--font-size-xs)",
+                  fontFamily: "var(--font-family)",
+                  cursor: "pointer",
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
 
