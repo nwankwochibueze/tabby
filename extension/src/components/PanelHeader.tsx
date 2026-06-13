@@ -1,19 +1,14 @@
 // WHY THIS FILE EXISTS:
 // PanelHeader renders the top bar of the Tabby side panel.
 // Shows logo, wordmark, total tab count and settings gear.
-// Settings gear shows contextual options based on auth state —
-// Sign out when logged in, Sign in when logged out.
+// Gear click switches to the SettingsPanel view.
 
-import { useState } from "react";
-import { Gear, SignOut, SignIn } from "@phosphor-icons/react";
+import { Gear } from "@phosphor-icons/react";
 import CountBadge from "./CountBadge";
-import { tokenApi } from "../shared/api";
 
 interface PanelHeaderProps {
   totalTabs: number;
-  onLogout: () => void;
-  onLogin: () => void;
-  isLoggedIn: boolean;
+  onSettingsClick: () => void;
 }
 
 const LogoMark = () => (
@@ -29,39 +24,7 @@ const LogoMark = () => (
   />
 );
 
-const PanelHeader = ({
-  totalTabs,
-  onLogout,
-  onLogin,
-  isLoggedIn,
-}: PanelHeaderProps) => {
-  const [showMenu, setShowMenu] = useState(false);
-
-  const handleLogout = async () => {
-    await tokenApi.clear();
-    setShowMenu(false);
-    onLogout();
-  };
-
-  const handleLogin = () => {
-    setShowMenu(false);
-    onLogin();
-  };
-
-  const menuButtonStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: "var(--spacing-sm)",
-    width: "100%",
-    padding: "10px var(--spacing-md)",
-    background: "transparent",
-    border: "none",
-    fontSize: "var(--font-size-sm)",
-    fontFamily: "var(--font-family)",
-    cursor: "pointer",
-    textAlign: "left" as const,
-  };
-
+const PanelHeader = ({ totalTabs, onSettingsClick }: PanelHeaderProps) => {
   return (
     <div
       style={{
@@ -73,7 +36,6 @@ const PanelHeader = ({
         background: "var(--bg-base)",
         borderBottom: "1px solid var(--border-default)",
         flexShrink: 0,
-        position: "relative",
       }}
     >
       <div
@@ -101,7 +63,7 @@ const PanelHeader = ({
       <CountBadge count={totalTabs} />
 
       <button
-        onClick={() => setShowMenu(!showMenu)}
+        onClick={onSettingsClick}
         style={{
           display: "flex",
           alignItems: "center",
@@ -111,86 +73,19 @@ const PanelHeader = ({
           cursor: "pointer",
           padding: "var(--spacing-xs)",
           borderRadius: "var(--radius-xs)",
-          color: showMenu ? "var(--text-secondary)" : "var(--text-muted)",
-          position: "relative",
+          color: "var(--text-muted)",
         }}
         onMouseEnter={(e) => {
           (e.currentTarget as HTMLButtonElement).style.color =
             "var(--text-secondary)";
         }}
         onMouseLeave={(e) => {
-          if (!showMenu) {
-            (e.currentTarget as HTMLButtonElement).style.color =
-              "var(--text-muted)";
-          }
+          (e.currentTarget as HTMLButtonElement).style.color =
+            "var(--text-muted)";
         }}
       >
         <Gear size={20} weight="regular" />
       </button>
-
-      {showMenu && (
-        <div
-          style={{
-            position: "absolute",
-            top: "48px",
-            right: "var(--spacing-lg)",
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-md)",
-            overflow: "hidden",
-            zIndex: 100,
-            minWidth: "160px",
-          }}
-        >
-          {isLoggedIn ? (
-            <button
-              onClick={handleLogout}
-              style={{ ...menuButtonStyle, color: "var(--text-danger)" }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "var(--bg-hover)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLButtonElement).style.background =
-                  "transparent";
-              }}
-            >
-              <SignOut size={14} />
-              Sign out
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={handleLogin}
-                style={{ ...menuButtonStyle, color: "var(--text-primary)" }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "var(--bg-hover)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "transparent";
-                }}
-              >
-                <SignIn size={14} />
-                Sign in to sync
-              </button>
-              <div
-                style={{
-                  padding: "6px var(--spacing-md)",
-                  fontSize: "var(--font-size-xs)",
-                  color: "var(--text-muted)",
-                  fontFamily: "var(--font-family)",
-                  borderTop: "1px solid var(--border-subtle)",
-                }}
-              >
-                ✨ Save sessions, sync across devices and get AI suggestions
-                with Pro
-              </div>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 };
