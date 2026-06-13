@@ -1,15 +1,25 @@
 // WHY THIS FILE EXISTS:
-// Shows a list of saved sessions the user can restore.
-// Each session reopens all its tabs in Chrome when clicked.
-// Only visible when the user is logged in.
+// Shows both manual and auto-saved sessions in the gear menu.
+// Manual saves are permanent named workspaces.
+// Auto saves are the last 3 automatic snapshots for crash recovery.
 
 import { useState, useEffect } from "react";
 import { sessionsApi } from "../shared/api";
 
-interface SavedSession {
+interface ManualSession {
   id: string;
   name: string;
   createdAt: string;
+  groups: Array<{
+    label: string;
+    tabs: Array<{ url: string; title: string }>;
+  }>;
+}
+
+interface AutoSave {
+  id: string;
+  name: string;
+  savedAt: string;
   groups: Array<{
     label: string;
     tabs: Array<{ url: string; title: string }>;
@@ -21,37 +31,56 @@ interface SessionsListProps {
 }
 
 const SessionsList = ({ onClose }: SessionsListProps) => {
-  const [sessions, setSessions] = useState<SavedSession[]>([]);
+  const [manualSessions, setManualSessions] = useState<ManualSession[]>([]);
+  const [autoSaves, setAutoSaves] = useState<AutoSave[]>([]);
   const [loading, setLoading] = useState(true);
   const [restoring, setRestoring] = useState<string | null>(null);
 
   useEffect(() => {
+    // Load manual sessions from backend
     sessionsApi.getAll().then((result) => {
-      setSessions(result.sessions ?? []);
+      setManualSessions(result.sessions ?? []);
+    });
+
+    // Load auto saves from chrome.storage
+    chrome.runtime.sendMessage({ type: "GET_AUTO_SAVES" }, (response) => {
+      setAutoSaves(response?.autoSaves ?? []);
       setLoading(false);
     });
   }, []);
 
-  const handleRestore = async (session: SavedSession) => {
-    setRestoring(session.id);
-
-    // WHY: Opens every tab from every group in the saved session.
-    // chrome.tabs.create opens each URL as a new tab in Chrome.
-    for (const group of session.groups) {
-      for (const tab of group.tabs) {
-        if (tab.url && !tab.url.startsWith("chrome://")) {
-          chrome.tabs.create({ url: tab.url, active: false });
+  const restoreTabs = (groups: AutoSave["groups"]) => {
+    chrome.tabs.query({}, (existingTabs) => {
+      const openUrls = new Set(existingTabs.map((t) => t.url));
+      for (const group of groups) {
+        for (const tab of group.tabs) {
+          if (
+            tab.url &&
+            !tab.url.startsWith("chrome://") &&
+            !openUrls.has(tab.url)
+          ) {
+            chrome.tabs.create({ url: tab.url, active: false });
+          }
         }
       }
-    }
-
-    setRestoring(null);
-    onClose();
+      setRestoring(null);
+      onClose();
+    });
   };
 
-  const handleDelete = async (id: string) => {
+  const handleRestoreManual = (session: ManualSession) => {
+    setRestoring(session.id);
+    restoreTabs(session.groups);
+  };
+
+  const handleRestoreAuto = (save: AutoSave) => {
+    setRestoring(save.id);
+    restoreTabs(save.groups);
+  };
+
+  const handleDeleteManual = async (id: string) => {
     await sessionsApi.delete(id);
-    setSessions(sessions.filter((s) => s.id !== id));
+    setManualSessions(manualSessions.filter((s) => s.id !== id));
   };
 
   const formatDate = (dateStr: string) => {
@@ -62,15 +91,76 @@ const SessionsList = ({ onClose }: SessionsListProps) => {
     });
   };
 
-  const totalTabs = (session: SavedSession) =>
-    session.groups.reduce((sum, g) => sum + g.tabs.length, 0);
+  const totalTabs = (groups: AutoSave["groups"]) =>
+    groups.reduce((sum, g) => sum + g.tabs.length, 0);
+
+  const sessionRowStyle = {
+    background: "var(--bg-surface)",
+    border: "1px solid var(--border-default)",
+    borderRadius: "var(--radius-xs)",
+    padding: "var(--spacing-sm) var(--spacing-md)",
+    display: "flex",
+    alignItems: "center",
+    gap: "var(--spacing-sm)",
+  };
+
+  const restoreButtonStyle = {
+    padding: "4px var(--spacing-sm)",
+    background: "var(--interactive-primary)",
+    border: "none",
+    borderRadius: "var(--radius-xs)",
+    color: "var(--text-inverse)",
+    fontSize: "var(--font-size-xs)",
+    fontFamily: "var(--font-family)",
+    cursor: "pointer",
+    whiteSpace: "nowrap" as const,
+    flexShrink: 0,
+  };
+
+  const deleteButtonStyle = {
+    padding: "4px var(--spacing-sm)",
+    background: "transparent",
+    border: "1px solid var(--border-default)",
+    borderRadius: "var(--radius-xs)",
+    color: "var(--text-muted)",
+    fontSize: "var(--font-size-xs)",
+    fontFamily: "var(--font-family)",
+    cursor: "pointer",
+    flexShrink: 0,
+  };
+
+  const sectionLabelStyle = {
+    fontSize: "var(--font-size-xs)",
+    fontWeight: "var(--font-weight-medium)" as const,
+    color: "var(--text-muted)",
+    textTransform: "uppercase" as const,
+    letterSpacing: "0.06em",
+    fontFamily: "var(--font-family)",
+    padding: "var(--spacing-xs) 0",
+  };
+
+  if (loading)
+    return (
+      <div
+        style={{
+          textAlign: "center",
+          padding: "var(--spacing-lg)",
+          color: "var(--text-muted)",
+          fontSize: "var(--font-size-sm)",
+          fontFamily: "var(--font-family)",
+        }}
+      >
+        Loading sessions...
+      </div>
+    );
 
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "var(--spacing-xs)",
+        gap: "var(--spacing-sm)",
+        padding: "var(--spacing-md)",
       }}
     >
       {/* Header */}
@@ -79,21 +169,9 @@ const SessionsList = ({ onClose }: SessionsListProps) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "var(--spacing-xs) 0",
         }}
       >
-        <span
-          style={{
-            fontSize: "var(--font-size-xs)",
-            fontWeight: "var(--font-weight-medium)",
-            color: "var(--text-muted)",
-            textTransform: "uppercase",
-            letterSpacing: "0.06em",
-            fontFamily: "var(--font-family)",
-          }}
-        >
-          Saved Sessions
-        </span>
+        <span style={sectionLabelStyle}>Sessions</span>
         <button
           onClick={onClose}
           style={{
@@ -109,51 +187,24 @@ const SessionsList = ({ onClose }: SessionsListProps) => {
         </button>
       </div>
 
-      {/* Loading state */}
-      {loading && (
+      {/* Manual saves */}
+      <div style={sectionLabelStyle}>Saved Workspaces</div>
+
+      {manualSessions.length === 0 && (
         <div
           style={{
-            textAlign: "center",
-            padding: "var(--spacing-lg)",
+            fontSize: "var(--font-size-xs)",
             color: "var(--text-muted)",
-            fontSize: "var(--font-size-sm)",
             fontFamily: "var(--font-family)",
+            padding: "var(--spacing-xs) 0",
           }}
         >
-          Loading sessions...
+          No saved workspaces yet
         </div>
       )}
 
-      {/* Empty state */}
-      {!loading && sessions.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "var(--spacing-lg)",
-            color: "var(--text-muted)",
-            fontSize: "var(--font-size-sm)",
-            fontFamily: "var(--font-family)",
-          }}
-        >
-          No saved sessions yet
-        </div>
-      )}
-
-      {/* Sessions list */}
-      {sessions.map((session) => (
-        <div
-          key={session.id}
-          style={{
-            background: "var(--bg-surface)",
-            border: "1px solid var(--border-default)",
-            borderRadius: "var(--radius-xs)",
-            padding: "var(--spacing-sm) var(--spacing-md)",
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--spacing-sm)",
-          }}
-        >
-          {/* Session info */}
+      {manualSessions.map((session) => (
+        <div key={session.id} style={sessionRowStyle}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
@@ -176,46 +227,76 @@ const SessionsList = ({ onClose }: SessionsListProps) => {
                 marginTop: "2px",
               }}
             >
-              {totalTabs(session)} tabs · {formatDate(session.createdAt)}
+              {totalTabs(session.groups)} tabs · {formatDate(session.createdAt)}
             </div>
           </div>
-
-          {/* Restore button */}
           <button
-            onClick={() => handleRestore(session)}
+            onClick={() => handleRestoreManual(session)}
             disabled={restoring === session.id}
-            style={{
-              padding: "4px var(--spacing-sm)",
-              background: "var(--interactive-primary)",
-              border: "none",
-              borderRadius: "var(--radius-xs)",
-              color: "var(--text-inverse)",
-              fontSize: "var(--font-size-xs)",
-              fontFamily: "var(--font-family)",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
+            style={restoreButtonStyle}
           >
             {restoring === session.id ? "Opening..." : "Restore"}
           </button>
-
-          {/* Delete button */}
           <button
-            onClick={() => handleDelete(session.id)}
-            style={{
-              padding: "4px var(--spacing-sm)",
-              background: "transparent",
-              border: "1px solid var(--border-default)",
-              borderRadius: "var(--radius-xs)",
-              color: "var(--text-muted)",
-              fontSize: "var(--font-size-xs)",
-              fontFamily: "var(--font-family)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
+            onClick={() => handleDeleteManual(session.id)}
+            style={deleteButtonStyle}
           >
             ✕
+          </button>
+        </div>
+      ))}
+
+      {/* Auto saves */}
+      <div style={{ ...sectionLabelStyle, marginTop: "var(--spacing-sm)" }}>
+        Auto Saves
+      </div>
+
+      {autoSaves.length === 0 && (
+        <div
+          style={{
+            fontSize: "var(--font-size-xs)",
+            color: "var(--text-muted)",
+            fontFamily: "var(--font-family)",
+            padding: "var(--spacing-xs) 0",
+          }}
+        >
+          No auto saves yet — saves every 30 mins
+        </div>
+      )}
+
+      {autoSaves.map((save) => (
+        <div key={save.id} style={sessionRowStyle}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                fontSize: "var(--font-size-sm)",
+                fontWeight: "var(--font-weight-medium)",
+                color: "var(--text-primary)",
+                fontFamily: "var(--font-family)",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {save.name}
+            </div>
+            <div
+              style={{
+                fontSize: "var(--font-size-xs)",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-family)",
+                marginTop: "2px",
+              }}
+            >
+              {totalTabs(save.groups)} tabs · {formatDate(save.savedAt)}
+            </div>
+          </div>
+          <button
+            onClick={() => handleRestoreAuto(save)}
+            disabled={restoring === save.id}
+            style={restoreButtonStyle}
+          >
+            {restoring === save.id ? "Opening..." : "Restore"}
           </button>
         </div>
       ))}
