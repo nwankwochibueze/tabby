@@ -11,6 +11,7 @@ import "dotenv/config";
 import auth from "./routes/auth";
 import sessions from "./routes/sessions";
 import authMiddleware from "./middleware/auth";
+import classify from "./routes/classify";
 
 const app = new Hono();
 
@@ -28,6 +29,7 @@ app.use(
 app.route("/auth", auth);
 app.use("/sessions/*", authMiddleware);
 app.route("/sessions", sessions);
+app.route("/ai", classify);
 
 app.get("/health", (c) => c.json({ status: "ok" }));
 
