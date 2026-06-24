@@ -17,6 +17,8 @@ import { tokenApi } from "../shared/api";
 type FilterMode = "ALL_TABS" | "RECENT" | "DUPLICATES";
 type View = "dashboard" | "settings" | "login";
 
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 const App = () => {
   const [groups, setGroups] = useState<TabGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,16 +54,43 @@ const App = () => {
     return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, []);
 
+  // WHY: Build a map of URL -> count across ALL groups first.
+  // This lets us detect duplicates regardless of which group a tab landed in.
+  const urlCounts = new Map<string, number>();
+  groups.forEach((group) => {
+    group.tabs.forEach((tab) => {
+      urlCounts.set(tab.url, (urlCounts.get(tab.url) ?? 0) + 1);
+    });
+  });
+
   const filteredGroups = groups
     .map((group) => {
       const filteredTabs = group.tabs.filter((tab) => {
         const query = searchQuery.toLowerCase();
-        if (!query) return true;
-        return (
+        const matchesSearch =
+          !query ||
           tab.title.toLowerCase().includes(query) ||
-          tab.url.toLowerCase().includes(query)
-        );
+          tab.url.toLowerCase().includes(query);
+
+        if (!matchesSearch) return false;
+
+        // WHY: RECENT shows only tabs accessed within the last hour.
+        // Falls back to excluding the tab if lastAccessed is missing,
+        // since we can't confirm recency without a timestamp.
+        if (filterMode === "RECENT") {
+          if (!tab.lastAccessed) return false;
+          return Date.now() - tab.lastAccessed <= ONE_HOUR_MS;
+        }
+
+        // WHY: DUPLICATES shows only tabs whose URL appears more than
+        // once across the entire tab set — not just within one group.
+        if (filterMode === "DUPLICATES") {
+          return (urlCounts.get(tab.url) ?? 0) > 1;
+        }
+
+        return true;
       });
+
       return { ...group, tabs: filteredTabs };
     })
     .filter((group) => group.tabs.length > 0);
